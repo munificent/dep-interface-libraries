@@ -1,0 +1,52 @@
+---
+ pkg/analyzer/lib/src/generated/parser.dart | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+diff --git a/pkg/analyzer/lib/src/generated/parser.dart b/pkg/analyzer/lib/src/generated/parser.dart
+index 47a4bc1..c0a74e5 100644
+--- a/pkg/analyzer/lib/src/generated/parser.dart
++++ b/pkg/analyzer/lib/src/generated/parser.dart
+@@ -4718,6 +4718,20 @@ class Parser {
+     return combinators;
+   }
+
++  /// Parse a list of import/export configurations in directive.
++  void _parseConfigurations() {
++    // TODO(rnystrom): Right now, it just ignores the configurations so it can
++    // parse without error. Eventually, it should store them in the AST, compare
++    // the configured library to the main one, etc.
++    while (_matchesKeyword(Keyword.IF)) {
++      getAndAdvance();
++      _expect(TokenType.OPEN_PAREN);
++      /*Token condition = */_expect(TokenType.IDENTIFIER);
++      _expect(TokenType.CLOSE_PAREN);
++      /*StringLiteral uri = */_parseUri();
++    }
++  }
++
+   /**
+    * Parse the documentation comment and metadata preceding a declaration. This
+    * method allows any number of documentation comments to occur before, after
+@@ -5458,6 +5472,10 @@ class Parser {
+     Token exportKeyword = _expectKeyword(Keyword.EXPORT);
+     StringLiteral libraryUri = _parseUri();
+     List<Combinator> combinators = _parseCombinators();
++
++    // TODO(rnystrom): Actually store them in AST.
++    _parseConfigurations();
++
+     Token semicolon = _expectSemicolon();
+     return new ExportDirective(commentAndMetadata.comment,
+         commentAndMetadata.metadata, exportKeyword, libraryUri, combinators,
+@@ -6052,6 +6070,10 @@ class Parser {
+       }
+     }
+     List<Combinator> combinators = _parseCombinators();
++
++    // TODO(rnystrom): Actually store them in AST.
++    _parseConfigurations();
++
+     Token semicolon = _expectSemicolon();
+     return new ImportDirective(commentAndMetadata.comment,
+         commentAndMetadata.metadata, importKeyword, libraryUri, deferredToken,
+--

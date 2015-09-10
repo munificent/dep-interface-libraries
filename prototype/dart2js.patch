@@ -1,0 +1,349 @@
+---
+ pkg/compiler/lib/src/deferred_load.dart        |  2 +-
+ pkg/compiler/lib/src/scanner/listener.dart     | 28 +++++++++++++-
+ pkg/compiler/lib/src/scanner/parser.dart       | 21 +++++++++++
+ pkg/compiler/lib/src/serialization/modelz.dart |  2 +
+ pkg/compiler/lib/src/tree/nodes.dart           | 52 ++++++++++++++++++++++++--
+ pkg/compiler/lib/src/tree/prettyprint.dart     |  9 +++++
+ pkg/compiler/lib/src/tree/unparser.dart        | 13 +++++++
+ 7 files changed, 121 insertions(+), 6 deletions(-)
+
+diff --git a/pkg/compiler/lib/src/deferred_load.dart b/pkg/compiler/lib/src/deferred_load.dart
+index 378710d..065e007 100644
+--- a/pkg/compiler/lib/src/deferred_load.dart
++++ b/pkg/compiler/lib/src/deferred_load.dart
+@@ -106,7 +106,7 @@ class DeferredLoadTask extends CompilerTask {
+   /// A synthetic [Import] representing the loading of the main
+   /// program.
+   final Import _fakeMainImport = new Import(null, new LiteralString(null,
+-      new LiteralDartString("main")), null, null, null);
++      new LiteralDartString("main")), null, null, null, null);
+
+   /// The OutputUnit that will be loaded when the program starts.
+   final OutputUnit mainOutputUnit = new OutputUnit(isMainOutput: true);
+diff --git a/pkg/compiler/lib/src/scanner/listener.dart b/pkg/compiler/lib/src/scanner/listener.dart
+index c3299a3..780efc6 100644
+--- a/pkg/compiler/lib/src/scanner/listener.dart
++++ b/pkg/compiler/lib/src/scanner/listener.dart
+@@ -62,6 +62,15 @@ class Listener {
+   void endCombinators(int count) {
+   }
+
++  void beginConfigurations(Token token) {
++  }
++
++  void endConfigurations(int count) {
++  }
++
++  void endConfiguration(Token token) {
++  }
++
+   void beginCompilationUnit(Token token) {
+   }
+
+@@ -853,6 +862,7 @@ class ElementListener extends Listener {
+
+   void endImport(Token importKeyword, Token deferredKeyword, Token asKeyword,
+                  Token semicolon) {
++    NodeList configurations = popNode();
+     NodeList combinators = popNode();
+     bool isDeferred = deferredKeyword != null;
+     Identifier prefix;
+@@ -861,6 +871,7 @@ class ElementListener extends Listener {
+     }
+     StringNode uri = popLiteralString();
+     addLibraryTag(new Import(importKeyword, uri, prefix, combinators,
++                             configurations,
+                              popMetadata(compilationUnitElement),
+                              isDeferred: isDeferred));
+   }
+@@ -877,9 +888,10 @@ class ElementListener extends Listener {
+   }
+
+   void endExport(Token exportKeyword, Token semicolon) {
++    NodeList configurations = popNode();
+     NodeList combinators = popNode();
+     StringNode uri = popNode();
+-    addLibraryTag(new Export(exportKeyword, uri, combinators,
++    addLibraryTag(new Export(exportKeyword, uri, combinators, configurations,
+                              popMetadata(compilationUnitElement)));
+   }
+
+@@ -895,6 +907,20 @@ class ElementListener extends Listener {
+
+   void endShow(Token showKeyword) => pushCombinator(showKeyword);
+
++  void endConfigurations(int count) {
++    if (0 == count) {
++      pushNode(null);
++    } else {
++      pushNode(makeNodeList(count, null, null, " "));
++    }
++  }
++
++  void endConfiguration(Token token) {
++    StringNode uri = popLiteralString();
++    Identifier condition = popNode();
++    pushNode(new Configuration(token, condition, uri));
++  }
++
+   void pushCombinator(Token keywordToken) {
+     NodeList identifiers = popNode();
+     pushNode(new Combinator(identifiers, keywordToken));
+diff --git a/pkg/compiler/lib/src/scanner/parser.dart b/pkg/compiler/lib/src/scanner/parser.dart
+index 66d26bd..75cd3f2 100644
+--- a/pkg/compiler/lib/src/scanner/parser.dart
++++ b/pkg/compiler/lib/src/scanner/parser.dart
+@@ -111,6 +111,7 @@ class Parser {
+       token = parseIdentifier(token.next);
+     }
+     token = parseCombinators(token);
++    token = parseConfigurations(token);
+     Token semicolon = token;
+     token = expect(';', token);
+     listener.endImport(importKeyword, deferredKeyword, asKeyword, semicolon);
+@@ -124,6 +125,7 @@ class Parser {
+     assert(optional('export', token));
+     token = parseLiteralStringOrRecoverExpression(token.next);
+     token = parseCombinators(token);
++    token = parseConfigurations(token);
+     Token semicolon = token;
+     token = expect(';', token);
+     listener.endExport(exportKeyword, semicolon);
+@@ -168,6 +170,25 @@ class Parser {
+     return token;
+   }
+
++  // TODO(rnystrom): Allow dotted identifier.
++  /// ('if' '(' identifier ')')*
++  Token parseConfigurations(Token token) {
++    listener.beginConfigurations(token);
++    int count = 0;
++    while (optional('if', token)) {
++      Token ifToken = token;
++      token = token.next;
++      token = expect('(', token);
++      token = parseIdentifier(token);
++      token = expect(')', token);
++      token = parseLiteralStringOrRecoverExpression(token);
++      listener.endConfiguration(ifToken);
++      count++;
++    }
++    listener.endConfigurations(count);
++    return token;
++  }
++
+   /// identifier (, identifier)*
+   Token parseIdentifierList(Token token) {
+     listener.beginIdentifierList(token);
+diff --git a/pkg/compiler/lib/src/serialization/modelz.dart b/pkg/compiler/lib/src/serialization/modelz.dart
+index b39d715..8682ef0 100644
+--- a/pkg/compiler/lib/src/serialization/modelz.dart
++++ b/pkg/compiler/lib/src/serialization/modelz.dart
+@@ -487,6 +487,7 @@ class LibraryElementZ extends DeserializedElementZ
+                   ..getEndToken().next = builder.symbolToken(SEMICOLON_INFO),
+               null, // prefix
+               null, // combinators
++              null, // configurations
+               null, // metadata
+               isDeferred: false);
+           _libraryDependencies[tag] = library;
+@@ -496,6 +497,7 @@ class LibraryElementZ extends DeserializedElementZ
+               builder.literalString(library.canonicalUri.toString())
+                   ..getEndToken().next = builder.symbolToken(SEMICOLON_INFO),
+               null,  // combinators
++              null,  // configurations
+               null); // metadata
+           _libraryDependencies[tag] = library;
+         }
+diff --git a/pkg/compiler/lib/src/tree/nodes.dart b/pkg/compiler/lib/src/tree/nodes.dart
+index e239366..98b41a1 100644
+--- a/pkg/compiler/lib/src/tree/nodes.dart
++++ b/pkg/compiler/lib/src/tree/nodes.dart
+@@ -21,6 +21,7 @@ abstract class Visitor<R> {
+   R visitClassNode(ClassNode node) => visitNode(node);
+   R visitCombinator(Combinator node) => visitNode(node);
+   R visitConditional(Conditional node) => visitExpression(node);
++  R visitConfiguration(Configuration node) => visitNode(node);
+   R visitContinueStatement(ContinueStatement node) => visitGotoStatement(node);
+   R visitDoWhile(DoWhile node) => visitLoop(node);
+   R visitEmptyStatement(EmptyStatement node) => visitStatement(node);
+@@ -1933,11 +1934,29 @@ class LibraryName extends LibraryTag {
+  * Combinators filter away some identifiers from the other library.
+  */
+ abstract class LibraryDependency extends LibraryTag {
+-  final StringNode uri;
++  final StringNode _uri;
+   final NodeList combinators;
++  final NodeList configurations;
++
++  // TODO(rnystrom): Doing this here is super hacky, but it ensures we always
++  // choose the configured library throughout dart2js.
++  StringNode get uri {
++    // See if there is a dart2js-specific configuration.
++    if (configurations != null) {
++      for (Configuration configuration in configurations.nodes) {
++        if (configuration.condition.source == "js") {
++          return configuration.uri;
++        }
++      }
++    }
++
++    // Use the default configuration.
++    return _uri;
++  }
+
+-  LibraryDependency(this.uri,
++  LibraryDependency(this._uri,
+                     this.combinators,
++                    this.configurations,
+                     Link<MetadataAnnotation> metadata)
+     : super(metadata);
+
+@@ -1958,9 +1977,10 @@ class Import extends LibraryDependency {
+
+   Import(this.importKeyword, StringNode uri,
+          this.prefix, NodeList combinators,
++         NodeList configurations,
+          Link<MetadataAnnotation> metadata,
+          {this.isDeferred})
+-      : super(uri, combinators, metadata);
++      : super(uri, combinators, configurations, metadata);
+
+   bool get isImport => true;
+
+@@ -1972,11 +1992,13 @@ class Import extends LibraryDependency {
+     uri.accept(visitor);
+     if (prefix != null) prefix.accept(visitor);
+     if (combinators != null) combinators.accept(visitor);
++    if (configurations != null) configurations.accept(visitor);
+   }
+
+   Token getBeginToken() => importKeyword;
+
+   Token getEndToken() {
++    if (configurations != null) return configurations.getEndToken().next;
+     if (combinators != null) return combinators.getEndToken().next;
+     if (prefix != null) return prefix.getEndToken().next;
+     return uri.getEndToken().next;
+@@ -2023,8 +2045,9 @@ class Export extends LibraryDependency {
+   Export(this.exportKeyword,
+          StringNode uri,
+          NodeList combinators,
++         NodeList configurations,
+          Link<MetadataAnnotation> metadata)
+-      : super(uri, combinators, metadata);
++      : super(uri, combinators, configurations, metadata);
+
+   bool get isExport => true;
+
+@@ -2035,11 +2058,13 @@ class Export extends LibraryDependency {
+   visitChildren(Visitor visitor) {
+     uri.accept(visitor);
+     if (combinators != null) combinators.accept(visitor);
++    if (configurations != null) configurations.accept(visitor);
+   }
+
+   Token getBeginToken() => exportKeyword;
+
+   Token getEndToken() {
++    if (configurations != null) return configurations.getEndToken().next;
+     if (combinators != null) return combinators.getEndToken().next;
+     return uri.getEndToken().next;
+   }
+@@ -2112,6 +2137,25 @@ class Combinator extends Node {
+   Token getEndToken() => identifiers.getEndToken();
+ }
+
++class Configuration extends Node {
++  final Token ifToken;
++  final Identifier condition;
++  final StringNode uri;
++
++  Configuration(this.ifToken, this.condition, this.uri);
++
++  accept(Visitor visitor) => visitor.visitConfiguration(this);
++
++  visitChildren(Visitor visitor) {
++    condition.accept(visitor);
++    uri.accept(visitor);
++  }
++
++  Token getBeginToken() => ifToken;
++
++  Token getEndToken() => uri.getEndToken();
++}
++
+ class Typedef extends Node {
+   final TypeAnnotation returnType;
+   final Identifier name;
+diff --git a/pkg/compiler/lib/src/tree/prettyprint.dart b/pkg/compiler/lib/src/tree/prettyprint.dart
+index ab4c87c..05979f5 100644
+--- a/pkg/compiler/lib/src/tree/prettyprint.dart
++++ b/pkg/compiler/lib/src/tree/prettyprint.dart
+@@ -373,10 +373,18 @@ class PrettyPrinter extends Indentation with Tagging<Node> implements Visitor {
+     closeNode();
+   }
+
++  visitConfiguration(Configuration node) {
++    openNode(node, "Configuration");
++    visitChildNode(node.condition, "condition");
++    visitChildNode(node.uri, "uri");
++    closeNode();
++  }
++
+   visitExport(Export node) {
+     openNode(node, "Export");
+     visitChildNode(node.uri, "uri");
+     visitChildNode(node.combinators, "combinators");
++    visitChildNode(node.configurations, "configurations");
+     closeNode();
+   }
+
+@@ -388,6 +396,7 @@ class PrettyPrinter extends Indentation with Tagging<Node> implements Visitor {
+     if (node.prefix != null) {
+       visitChildNode(node.prefix, "prefix");
+     }
++    visitChildNode(node.configurations, "configurations");
+     closeNode();
+   }
+
+diff --git a/pkg/compiler/lib/src/tree/unparser.dart b/pkg/compiler/lib/src/tree/unparser.dart
+index b7d3109..e5b3c2e 100644
+--- a/pkg/compiler/lib/src/tree/unparser.dart
++++ b/pkg/compiler/lib/src/tree/unparser.dart
+@@ -779,6 +779,9 @@ class Unparser extends Indentation implements Visitor {
+       write(' ');
+       visit(node.combinators);
+     }
++    if (node.configurations != null) {
++      visit(node.configurations);
++    }
+     write(node.getEndToken().value);
+     newline();
+   }
+@@ -790,6 +793,9 @@ class Unparser extends Indentation implements Visitor {
+       write(' ');
+       visit(node.combinators);
+     }
++    if (node.configurations != null) {
++      visit(node.configurations);
++    }
+     write(node.getEndToken().value);
+     newline();
+   }
+@@ -812,6 +818,13 @@ class Unparser extends Indentation implements Visitor {
+     visit(node.identifiers);
+   }
+
++  visitConfiguration(Configuration node) {
++    write(' if (');
++    visit(node.condition);
++    write(') ');
++    visit(node.uri);
++  }
++
+   visitMetadata(Metadata node) {
+     addToken(node.token);
+     visit(node.expression);
+--

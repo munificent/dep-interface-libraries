@@ -1,0 +1,59 @@
+---
+ runtime/vm/parser.cc | 33 +++++++++++++++++++++++++++++++--
+ 1 file changed, 31 insertions(+), 2 deletions(-)
+
+diff --git a/runtime/vm/parser.cc b/runtime/vm/parser.cc
+index ed49a3c..dde90e3 100644
+--- a/runtime/vm/parser.cc
++++ b/runtime/vm/parser.cc
+@@ -5834,8 +5834,7 @@ void Parser::ParseLibraryImportExport(intptr_t metadata_pos) {
+   AstNode* url_literal = ParseStringLiteral(false);
+   ASSERT(url_literal->IsLiteralNode());
+   ASSERT(url_literal->AsLiteralNode()->literal().IsString());
+-  const String& url = String::Cast(url_literal->AsLiteralNode()->literal());
+-  if (url.Length() == 0) {
++  if (String::Cast(url_literal->AsLiteralNode()->literal()).Length() == 0) {
+     ReportError("library url expected");
+   }
+   bool is_deferred_import = false;
+@@ -5884,9 +5883,39 @@ void Parser::ParseLibraryImportExport(intptr_t metadata_pos) {
+       hide_names = Array::MakeArray(hide_list);
+     }
+   }
++
++  // TODO(rnystrom): Hack. Prototype code for parsing configurations. Ignore
++  // all but one named "vm".
++  while (CurrentToken() == Token::kIF) {
++    ConsumeToken();
++
++    ExpectToken(Token::kLPAREN);
++
++    if (CurrentToken() != Token::kIDENT) {
++      ReportError("expected configuration name");
++    }
++
++    String* configuration = CurrentLiteral();
++    ConsumeToken();
++
++    ExpectToken(Token::kRPAREN);
++
++    AstNode* config_url = ParseStringLiteral(false);
++    ASSERT(config_url->IsLiteralNode());
++    ASSERT(config_url->AsLiteralNode()->literal().IsString());
++    if (String::Cast(config_url->AsLiteralNode()->literal()).Length() == 0) {
++      ReportError("configuration url expected");
++    }
++
++    // If this is the VM's configuration, use that URL instead of the original
++    // one.
++    if (configuration->Equals("vm")) url_literal = config_url;
++  }
++
+   ExpectSemicolon();
+
+   // Canonicalize library URL.
++  const String& url = String::Cast(url_literal->AsLiteralNode()->literal());
+   const String& canon_url = String::CheckedHandle(
+       CallLibraryTagHandler(Dart_kCanonicalizeUrl, import_pos, url));
+
+--
