@@ -327,8 +327,9 @@ phases, this is dramatically simpler. The process works like so:
 **To tell if two types A and B are compatible:**
 
  1. If A and B are named types:
-     1. If they don't refer to the same declaration, fail.
-     2. If their type argument lists are not compatible, fail.
+     1. If they are both `void`, succeed.
+     2. If they don't refer to the same declaration, fail.
+     3. If their type argument lists are not compatible, fail.
  2. If A and B are function types:
      1. If the return types are not compatible, fail.
      2. If the mandatory parameter lists are not compatible, fail.
@@ -359,7 +360,7 @@ The first phase gets us pretty far. We can define and statically check
 configuration-specific functions.
 
 It even lets us define classes that *appear* to be configuration-specific by
-either using a factory constructor that calls a configuration-specific factory
+using a factory constructor that calls a configuration-specific factory
 function:
 
 ```dart
