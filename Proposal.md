@@ -147,10 +147,10 @@ where you go to if you "Go to Definition" on a member declared in the configured
 library.
 
 Following that are one or more *configurations*. Each is an `if ()` clause
-followed by a URI. The condition for that if is a simple `const` expression
-evaluated in a restricted scope. The scope is pre-populated by a Dart
-implementation to let the user know things like which "dart:" libraries are
-available. Things like `-D` arguments are available here too.
+followed by a URI. The condition in the `if` is a simple test against
+environment declarations (`-D` command-line arguments). Some environment
+declarations are pre-populated by a Dart implementation to let the user know
+which "dart:" libraries are available.
 
 At runtime (or at compile time in dart2js), these `if ()` clauses are tried one
 at a time. Each condition is evaluated. If it comes out `true` then we use the
@@ -319,25 +319,26 @@ phases, this is dramatically simpler. The process works like so:
 
 **To tell if an interface library I and a configuration-specific library S are compatible:**
 
- 1. For every top-level function *f* in I:
+ 1. For every top-level function *f* imported or exported from I, after
+    any combinators have been applied:
     1. If S does not contain a top-level function with the same name, fail.
     2. If the type of *f* in I is not compatible with the type of *f* in S,
        fail.
 
 **To tell if two types A and B are compatible:**
 
- 1. If A and B are named types:
-     1. If they are both `void`, succeed.
-     2. If they don't refer to the same declaration, fail.
-     3. If their type argument lists are not compatible, fail.
- 2. If A and B are function types:
+ 1. If A and B are both `void`, succeed.
+ 2. If A and B are interface types:
+     1. If they don't refer to the same declaration, fail.
+     2. If their type argument lists are not compatible, fail.
+ 3. If A and B are function types:
      1. If the return types are not compatible, fail.
      2. If the mandatory parameter lists are not compatible, fail.
      3. If the optional positional parameter lists are not compatible, fail.
      4. If the map of named parameters is not compatible, fail.
-     5. If any corresponding default values are not equal, fail.
+     5. If any corresponding default values are not identical, fail.
      6. Otherwise, succeed.
- 3. Otherwise, fail.
+ 4. Otherwise, fail.
 
 **To tell if two maps of names to types compatible:**
 
