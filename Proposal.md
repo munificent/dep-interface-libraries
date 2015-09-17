@@ -179,7 +179,7 @@ We misspelled the function name. That means the call to `showMessage()` in
 If the static checker only looks at "warn_interface.dart", we won't get any
 static warnings about this.
 
-To avoid problems like this where an configuration-specific library can't
+To avoid problems like this where a configuration-specific library can't
 correctly replace the interface library, there is an additional set of static
 warnings to determine *library compatibility*.
 
