@@ -272,32 +272,19 @@ After a URI is chosen, the directive is processed as normally using that URI.
 
 We often use configuration-specific code to detect which Dart implementation a
 program is running in, or which "dart:" libraries are available. To expose that,
-every Dart implementation will expose a set of predefined constants that are
+every Dart implementation exposes a set of corresponding constants as
 part of the environment.
 
-All predefined constants start with "dart." and the Dart platform reserves the
-use of constants starting with that prefix. The following constants will be
-`true` or `false` based on whether or not the implementation supports the
-corresponding "dart:" library:
+For every `dart:` library that the embedder exposes, a corresponding constant
+is implicitly added to the environment with value "true". The constant's name
+starts with "dart.library." and is suffixed by the import-name of the library.
+For example, for an embedder that supports `dart:io` the constant
+`dart.library.io` is in the environment, and has the value "true".
 
-* `dart.library.async`
-* `dart.library.collection`
-* `dart.library.convert`
-* `dart.library.core`
-* `dart.library.developer`
-* `dart.library.html`
-* `dart.library.indexed_db`
-* `dart.library.io`
-* `dart.library.isolate`
-* `dart.library.js`
-* `dart.library.math`
-* `dart.library.mirrors`
-* `dart.library.profiler`
-* `dart.library.svg`
-* `dart.library.typed_data`
-* `dart.library.web_audio`
-* `dart.library.web_gl`
-* `dart.library.web_sql`
+All library constants start with "dart." and the Dart platform reserves the
+use of constants starting with that prefix. In case of conflict with a
+user-defined environment variable, the user-defined value shadows the
+value that is provided by the embedder.
 
 ### Static checking
 
