@@ -317,43 +317,64 @@ configurable *types*.
 In other words, we statically check top-level functions. As you'll see in later
 phases, this is dramatically simpler. The process works like so:
 
-**To tell if an interface library I and a configuration-specific library S are compatible:**
+**To tell if two libraries are compatible:**
 
- 1. For every top-level function *f* imported or exported from I, after
-    any combinators have been applied:
-    1. If S does not contain a top-level function with the same name, fail.
-    2. If the type of *f* in I is not compatible with the type of *f* in S,
-       fail.
+1.  Produce the *visible namespace* of each library. This is the export
+    namespace of the library after the `show` and `hide` combinators in the
+    directive have been applied.
+2.  If the visible namespace of either library contains a type declaration
+    (class, enum, or typedef), fail.
+3.  If the maps of names to members of the two visible namespaces are not
+    compatible, fail.
 
-**To tell if two types A and B are compatible:**
+**To tell if two maps of names to members A and B are compatible:**
 
- 1. If A and B are both `void`, succeed.
- 2. If A and B are interface types:
-     1. If they don't refer to the same declaration, fail.
-     2. If their type argument lists are not compatible, fail.
- 3. If A and B are function types:
-     1. If the return types are not compatible, fail.
-     2. If the mandatory parameter lists are not compatible, fail.
-     3. If the optional positional parameter lists are not compatible, fail.
-     4. If the map of named parameters is not compatible, fail.
-     5. If any corresponding default values are not identical, fail.
-     6. Otherwise, succeed.
- 4. Otherwise, fail.
+1.  If the maps do not have the same sets of names, fail.
+2.  For each corresponding pair of members A.m and B.m:
+    1.  If A.m and B.m are not the same *kind*, fail. "Kind" is which kind of
+        declaration the member is: method, getter, setter. Note that variables
+        are not a kind because a variable is just a getter (final) or pair of
+        getter and setter (non-final).
+    2.  Else if A.m is a method:
+        1.  If their return types are not compatible, fail.
+        2.  If their parameter lists are not compatible, fail.
+    3.  Else if A.m is a getter:
+        1.  If their return types are not compatible, fail.
+    4.  Else (A.m is a setter):
+        1.  If their value types are not compatible, fail.
+
+**To tell if two types A in I and B in S are compatible:**
+
+1.  If A and B are both `void`, succeed.
+2.  Else if A and B are both named types:
+    1.  If their type argument lists are not compatible, fail.
+    2.  If they do not refer to the same declaration, fail.
+3.  Else (A and B are function types):
+    1.  If the return types are not compatible, fail.
+    2.  If their parameter lists are not compatible, fail.
+
+**To tell if two parameter lists are compatible:**
+
+1.  If the mandatory parameter lists are not compatible, fail.
+2.  If the optional positional parameter lists are not compatible, fail.
+3.  If the named parameter maps are not compatible, fail.
+4.  If any corresponding default values are not identical, fail.
+5.  Otherwise, succeed.
 
 **To tell if two maps of names to types compatible:**
 
- 1. If the maps do not have the same sets of names, fail.
- 2. If any name maps two types in either map that are not compatible, fail.
- 3. Otherwise, succeed.
+1.  If the maps do not have the same sets of names, fail.
+2.  If any name maps two types in either map that are not compatible, fail.
+3.  Otherwise, succeed.
 
 **To tell if two lists of types are compatible:**
 
- 1. If the lists have different lengths, fail.
- 2. If any lockstep pair of types in the lists aren't compatible, fail.
- 3. Otherwise, succeed.
+1.  If the lists have different lengths, fail.
+2.  If any lockstep pair of types in the lists aren't compatible, fail.
+3.  Otherwise, succeed.
 
-Note that this is much tighter than assignment compatibility, or even subtyping.
-We could loosen this here, but as we'll see, this helps later phases.
+Note that this is *much* tighter than assignment compatibility, or even
+subtyping.
 
 #### Phase 2: Types
 
@@ -472,9 +493,74 @@ This is the kind of stuff we'd like to catch with static checking. Doing that
 requires being able to check configuration-specific *types* for compatibility in
 addition to functions.
 
-We amend the above checks to:
+We change the above checks to:
 
-**TODO: Type compatibility rules.**
+**To tell if two libraries are compatible:**
+
+1.  Produce the *visible namespace* of each library. This is the export
+    namespace of the library after the `show` and `hide` combinators in the
+    directive have been applied.
+2.  If the maps of names to members of the two visible namespaces are not
+    compatible, fail.
+
+**To tell if two maps of names to members A and B are compatible:**
+
+1.  If the maps do not have the same sets of names, fail.
+2.  For each corresponding pair of members A.m and B.m:
+    1.  If A.m and B.m are not the same *kind*, fail. "Kind" is which kind of
+        declaration the member is: typedef, class, enum, constructor, method,
+        getter, setter. Note that variables are not a kind because a variable
+        is just a getter (final) or pair of getter and setter (non-final).
+    2.  If A.m is a typedef:
+        1.  If their type parameter lists are not compatible, fail.
+        2.  If their return types are not compatible, fail.
+        3.  If their parameter lists are not compatible, fail.
+    3.  Else if A.m is a class:
+        1.  If A.m and B.m are not compatible (see below), fail.
+    4.  Else if A.m is a enum:
+        1.  If the list of enum values in A.m and B.m are not identical, fail.
+    5.  Else if A.m is a constructor:
+        1.  If A.m is generative and B.m is not, or vice versa, fail.
+        2.  If their parameter lists are not compatible, fail.
+    6.  Else if A.m is a method:
+        1.  If A.m is abstract and B.m is not, or vice versa, fail.
+        2.  If their return types are not compatible, fail.
+        3.  If their parameter lists are not compatible, fail.
+    7.  Else if A.m is a getter:
+        1.  If A.m is abstract and B.m is not, or vice versa, fail.
+        2.  If their return types are not compatible, fail.
+    8.  Else (A.m is a setter):
+        1.  If A.m is abstract and B.m is not, or vice versa, fail.
+        2.  If their value types are not compatible, fail.
+
+**To tell if two types A in I and B in S are compatible:**
+
+1.  If A and B are both `void`, succeed.
+2.  Else if A and B are both named types:
+    1.  If their type argument lists are not compatible, fail.
+    2.  If they refer to the same declaration, succeed.
+    3.  Else if A refers to a type defined in I and B refers to a type
+        defined in S with the same name, succeed.
+    4.  Else fail.
+3.  Else (A and B are function types):
+    1.  If the return types are not compatible, fail.
+    2.  If their parameter lists are not compatible, fail.
+
+And we add:
+
+**To tell if two classes are compatible:**
+
+1.  If one is abstract and the other is not, fail.
+1.  If their type argument lists are not compatible, fail.
+2.  If their superclasses are not compatible, fail.
+3.  If their list of mixins are not compatible, fail.
+4.  If their list of implemented interfaces are not compatible, fail.
+5.  If their maps of names to public constructors are not compatible, fail.
+6.  If their maps of names to public instance members (including inherited
+    ones) are not compatible, fail.
+7.  If their maps of names to public static members are not compatible, fail.
+
+*TODO: Can we ignore private classes in superclass, superinterfaces, and mixins?*
 
 ## Alternatives
 
