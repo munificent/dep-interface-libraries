@@ -341,9 +341,9 @@ phases, this is dramatically simpler. The process works like so:
     3.  Else if A.m is a getter:
         1.  If their return types are not compatible, fail.
     4.  Else (A.m is a setter):
-        1.  If their value types are not compatible, fail.
+        1.  If their parameter types are not compatible, fail.
 
-**To tell if two types A in I and B in S are compatible:**
+**To tell if two types A and B are compatible:**
 
 1.  If A and B are both `void`, succeed.
 2.  Else if A and B are both named types:
@@ -361,7 +361,7 @@ phases, this is dramatically simpler. The process works like so:
 4.  If any corresponding default values are not identical, fail.
 5.  Otherwise, succeed.
 
-**To tell if two maps of names to types compatible:**
+**To tell if two maps of names to types are compatible:**
 
 1.  If the maps do not have the same sets of names, fail.
 2.  If any name maps two types in either map that are not compatible, fail.
@@ -521,7 +521,8 @@ We change the above checks to:
         1.  If the list of enum values in A.m and B.m are not identical, fail.
     5.  Else if A.m is a constructor:
         1.  If A.m is generative and B.m is not, or vice versa, fail.
-        2.  If their parameter lists are not compatible, fail.
+        2.  If A.m is const and B.m is not, or vice versa, fail.
+        3.  If their parameter lists are not compatible, fail.
     6.  Else if A.m is a method:
         1.  If A.m is abstract and B.m is not, or vice versa, fail.
         2.  If their return types are not compatible, fail.
@@ -533,25 +534,35 @@ We change the above checks to:
         1.  If A.m is abstract and B.m is not, or vice versa, fail.
         2.  If their value types are not compatible, fail.
 
-**To tell if two types A in I and B in S are compatible:**
+**To tell if two types A and B are compatible:**
 
 1.  If A and B are both `void`, succeed.
 2.  Else if A and B are both named types:
     1.  If their type argument lists are not compatible, fail.
     2.  If they refer to the same declaration, succeed.
-    3.  Else if A refers to a type defined in I and B refers to a type
-        defined in S with the same name, succeed.
+    3.  Else if A refers to a type in the visible namespace of one of the
+        libraries being checked and B refers to a type with the same name in the
+        other library, succeed. (These types will themselves also be checked for compatibility as we walk the members of the library above.)
     4.  Else fail.
-3.  Else (A and B are function types):
+3.  Else if A and B are function types:
     1.  If the return types are not compatible, fail.
     2.  If their parameter lists are not compatible, fail.
+4.  Else fail (they are different kinds of types).
 
 And we add:
+
+**To tell if two lists of type parameters are compatible:**
+
+1.  If the lists have different lengths, fail.
+2.  For each lockstep pair of type parameters:
+    1. If one has an upper bound and the other does not, fail.
+    2. If the upper bounds are not compatible, fail.
+3.  Otherwise, succeed.
 
 **To tell if two classes are compatible:**
 
 1.  If one is abstract and the other is not, fail.
-1.  If their type argument lists are not compatible, fail.
+1.  If their type parameter lists are not compatible, fail.
 2.  If their superclasses are not compatible, fail.
 3.  If their list of mixins are not compatible, fail.
 4.  If their list of implemented interfaces are not compatible, fail.
