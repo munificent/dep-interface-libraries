@@ -357,20 +357,16 @@ phases, this is dramatically simpler. The process works like so:
 
 1.  If the mandatory parameter lists are not compatible, fail.
 2.  If the optional positional parameter lists are not compatible, fail.
-3.  If the named parameter maps are not compatible, fail.
-4.  If any corresponding default values are not identical, fail.
+3.  If one declares a named parameter that the other lacks, fail.
+4.  For each corresponding pair of named parameters:
+    1. If the types are not compatible, fail.
+    2. If the default values are not identical, fail.
 5.  Otherwise, succeed.
-
-**To tell if two maps of names to types are compatible:**
-
-1.  If the maps do not have the same sets of names, fail.
-2.  If any name maps two types in either map that are not compatible, fail.
-3.  Otherwise, succeed.
 
 **To tell if two lists of types are compatible:**
 
 1.  If the lists have different lengths, fail.
-2.  If any lockstep pair of types in the lists aren't compatible, fail.
+2.  If any corresponding pair of types in the lists aren't compatible, fail.
 3.  Otherwise, succeed.
 
 Note that this is *much* tighter than assignment compatibility, or even
