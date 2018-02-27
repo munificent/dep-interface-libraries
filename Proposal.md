@@ -14,13 +14,13 @@ Stakeholders:
 
 Contributors:
 
-- [John Messerly][john] (jmesserly@google.com)
+- [Jenny Messerly][jenny] (jmesserly@google.com)
 - [Natalie Weizenbaum][natalie] (nweiz@google.com)
 
 [bob]: https://github.com/munificent
 [erik]: https://github.com/eernstg
 [florian]: https://github.com/floitschG
-[john]: https://github.com/jmesserly
+[jenny]: https://github.com/jmesserly
 [lasse]: https://github.com/lrhn
 [natalie]: https://github.com/nex3
 
